@@ -398,11 +398,11 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
 
 logging.info(
     colorama.Back.GREEN
-    + "\n川虎的温馨提示：访问 http://localhost:7860 查看界面"
+    + "\n访问 http://localhost:7860 查看界面"
     + colorama.Style.RESET_ALL
 )
 # 默认开启本地服务器，默认可以直接从IP访问，默认不创建公开分享链接
-demo.title = "川虎ChatGPT 🚀"
+demo.title = "亲爱的我 ❤️"
 
 if __name__ == "__main__":
     reload_javascript()
@@ -429,12 +429,13 @@ if __name__ == "__main__":
                 share=False,
                 auth=(username, password),
                 favicon_path="./assets/favicon.ico",
-                inbrowser=True,
+                inbrowser=False,
             )
         else:
             demo.queue(concurrency_count=CONCURRENT_COUNT).launch(
-                share=False, favicon_path="./assets/favicon.ico", inbrowser=True
+                share=False, favicon_path="./assets/favicon.ico", inbrowser=False,
             )  # 改为 share=True 可以创建公开分享链接
-        # demo.queue(concurrency_count=CONCURRENT_COUNT).launch(server_name="0.0.0.0", server_port=7860, share=False) # 可自定义端口
+        demo.queue(concurrency_count=CONCURRENT_COUNT).launch(
+            server_name="0.0.0.0", server_port=7860, share=False)  # 可自定义端口
         # demo.queue(concurrency_count=CONCURRENT_COUNT).launch(server_name="0.0.0.0", server_port=7860,auth=("在这里填写用户名", "在这里填写密码")) # 可设置用户名与密码
         # demo.queue(concurrency_count=CONCURRENT_COUNT).launch(auth=("在这里填写用户名", "在这里填写密码")) # 适合Nginx反向代理
