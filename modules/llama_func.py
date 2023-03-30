@@ -1,7 +1,7 @@
 import os
 import logging
-
-from llama_index import GPTSimpleVectorIndex
+import traceback
+from llama_index import GPTSimpleVectorIndex, ServiceContext
 from llama_index import download_loader
 from llama_index import (
     Document,
@@ -11,6 +11,7 @@ from llama_index import (
     RefinePrompt,
 )
 from langchain.llms import OpenAI
+from langchain.chat_models import ChatOpenAI
 import colorama
 
 from modules.presets import *
@@ -73,7 +74,7 @@ def construct_index(
     separator = " " if separator == "" else separator
 
     llm_predictor = LLMPredictor(
-        llm=OpenAI(model_name="gpt-3.5-turbo-0301", openai_api_key=api_key)
+        llm=ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=api_key)
     )
     prompt_helper = PromptHelper(
         max_input_size,
@@ -91,14 +92,17 @@ def construct_index(
         try:
             documents = get_documents(file_src)
             logging.debug("构建索引中……")
-            index = GPTSimpleVectorIndex(
-                documents, llm_predictor=llm_predictor, prompt_helper=prompt_helper
+            service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, prompt_helper=prompt_helper)
+            index = GPTSimpleVectorIndex.from_documents(
+                documents, service_context=service_context
             )
+            logging.debug("索引构建完成！")
             os.makedirs("./index", exist_ok=True)
-            index.save_to_disk(f"./index/{index_name}.json")
+            index.save_to_disk(f"./index/{index_name}.json")  # TODO 改为mongodb存储
+            logging.debug("索引已保存至本地!")
             return index
         except Exception as e:
-            print(e)
+            print("索引构建失败：\n", traceback.print_exc())
             return None
 
 
@@ -154,9 +158,9 @@ def ask_ai(
     logging.debug("Index file found")
     logging.debug("Querying index...")
     llm_predictor = LLMPredictor(
-        llm=OpenAI(
+        llm=ChatOpenAI(
             temperature=temprature,
-            model_name="gpt-3.5-turbo-0301",
+            model_name="gpt-3.5-turbo",
             prefix_messages=prefix_messages,
         )
     )
@@ -166,7 +170,6 @@ def ask_ai(
     rf_prompt = RefinePrompt(refine_tmpl.replace("{reply_language}", reply_language))
     response = index.query(
         question,
-        llm_predictor=llm_predictor,
         similarity_top_k=sim_k,
         text_qa_template=qa_prompt,
         refine_template=rf_prompt,
@@ -174,15 +177,15 @@ def ask_ai(
     )
 
     if response is not None:
-        logging.info(f"Response: {response}")
+        # logging.info(f"Response: {response}")
         ret_text = response.response
-        nodes = []
-        for index, node in enumerate(response.source_nodes):
-            brief = node.source_text[:25].replace("\n", "")
-            nodes.append(
-                f"<details><summary>[{index + 1}]\t{brief}...</summary><p>{node.source_text}</p></details>"
-            )
-        new_response = ret_text + "\n----------\n" + "\n\n".join(nodes)
+        # nodes = []
+        # for index, node in enumerate(response.source_nodes):
+            # brief = node.source_text[:25].replace("\n", "")
+            # nodes.append(
+            #     f"<details><summary>[{index + 1}]\t{brief}...</summary><p>{node.source_text}</p></details>"
+            # )
+        new_response = ret_text # + "\n----------\n" + "\n\n".join(nodes)
         logging.info(
             f"Response: {colorama.Fore.BLUE}{ret_text}{colorama.Style.RESET_ALL}"
         )
