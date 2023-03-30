@@ -45,7 +45,7 @@ ol:not(.options), ul:not(.options) {
         background-color: #FFFFFF !important;
     }
     [data-testid = "user"] {
-        background-color: #d19cca !important;
+        background-color: #a6e22e !important;
     }
 }
 /* 暗色 */
@@ -58,7 +58,7 @@ ol:not(.options), ul:not(.options) {
         background-color: #2C2C2C !important;
     }
     [data-testid = "user"] {
-        background-color: #d19cca !important;
+        background-color: #a6e22e !important;
     }
     body {
         background-color: var(--neutral-950) !important;
