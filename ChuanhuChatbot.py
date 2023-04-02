@@ -5,52 +5,12 @@ import sys
 
 import gradio as gr
 
+from modules.config import *
 from modules.utils import *
 from modules.presets import *
 from modules.overwrites import *
 from modules.chat_func import *
 from modules.openai_func import get_usage
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
-)
-
-my_api_key = ""  # 在这里输入你的 API 密钥
-
-# if we are running in Docker
-if os.environ.get("dockerrun") == "yes":
-    dockerflag = True
-else:
-    dockerflag = False
-
-authflag = False
-
-if dockerflag:
-    my_api_key = os.environ.get("my_api_key")
-    if my_api_key == "empty":
-        logging.error("Please give a api key!")
-        sys.exit(1)
-    # auth
-    username = os.environ.get("USERNAME")
-    password = os.environ.get("PASSWORD")
-    if not (isinstance(username, type(None)) or isinstance(password, type(None))):
-        authflag = True
-else:
-    if (
-        not my_api_key
-        and os.path.exists("api_key.txt")
-        and os.path.getsize("api_key.txt")
-    ):
-        with open("api_key.txt", "r") as f:
-            my_api_key = f.read().strip()
-    if os.path.exists("auth.json"):
-        with open("auth.json", "r", encoding='utf-8') as f:
-            auth = json.load(f)
-            username = auth["username"]
-            password = auth["password"]
-            if username != "" and password != "":
-                authflag = True
 
 gr.Chatbot.postprocess = postprocess
 PromptHelper.compact_text_chunks = compact_text_chunks
@@ -59,6 +19,7 @@ with open("assets/custom.css", "r", encoding="utf-8") as f:
     customCSS = f.read()
 
 with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
+    user_name = gr.State("")
     history = gr.State([])
     token_count = gr.State([])
     promptTemplates = gr.State(load_template(get_template_names(plain=True)[0], mode=2))
@@ -68,14 +29,25 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
     topic = gr.State("未命名对话历史记录")
 
     with gr.Row():
-        gr.HTML(title)
+        with gr.Column():
+            gr.HTML(title)
+            user_info = gr.Markdown(value="", elem_id="user_info")
         status_display = gr.Markdown(get_geoip(), elem_id="status_display")
 
-    with gr.Row(scale=1).style(equal_height=True):
+        # https://github.com/gradio-app/gradio/pull/3296
+        def create_greeting(request: gr.Request):
+            if hasattr(request, "username") and request.username: # is not None or is not ""
+                logging.info(f"Get User Name: {request.username}")
+                return gr.Markdown.update(value=f"User: {request.username}"), request.username
+            else:
+                return gr.Markdown.update(value=f"User: default", visible=False), ""
+        demo.load(create_greeting, inputs=None, outputs=[user_info, user_name])
+
+    with gr.Row().style(equal_height=True):
         with gr.Column(scale=5):
-            with gr.Row(scale=1):
+            with gr.Row():
                 chatbot = gr.Chatbot(elem_id="chuanhu_chatbot").style(height="100%")
-            with gr.Row(scale=1):
+            with gr.Row():
                 with gr.Column(scale=12):
                     user_input = gr.Textbox(
                         show_label=False, placeholder="在这里输入"
@@ -83,7 +55,7 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
                 with gr.Column(min_width=70, scale=1):
                     submitBtn = gr.Button("发送", variant="primary")
                     cancelBtn = gr.Button("取消", variant="secondary", visible=False)
-            with gr.Row(scale=1):
+            with gr.Row():
                 emptyBtn = gr.Button(
                     "🧹 新的对话",
                 )
@@ -103,7 +75,7 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
                         visible=not HIDE_MY_KEY,
                         label="API-Key",
                     )
-                    usageTxt = gr.Markdown(get_usage(my_api_key), elem_id="usage_display")
+                    usageTxt = gr.Markdown("**发送消息** 或 **提交key** 以显示额度", elem_id="usage_display")
                     model_select_dropdown = gr.Dropdown(
                         label="选择模型", choices=MODELS, multiselect=False, value=MODELS[0]
                     )
@@ -118,6 +90,10 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
                         value=REPLY_LANGUAGES[0],
                     )
                     index_files = gr.Files(label="上传索引文件", type="file", multiple=True)
+                    two_column = gr.Checkbox(label="双栏pdf", value=advance_docs["pdf"].get("two_column", False))
+                    # TODO: 公式ocr
+                    # formula_ocr = gr.Checkbox(label="识别公式", value=advance_docs["pdf"].get("formula_ocr", False))
+                    updateDocConfigBtn = gr.Button("更新解析文件参数")
 
                 with gr.Tab(label="Prompt"):
                     systemPromptTxt = gr.Textbox(
@@ -204,12 +180,12 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
                         )
 
                     with gr.Accordion("网络设置", open=False):
-                        apiurlTxt = gr.Textbox(
+                        apihostTxt = gr.Textbox(
                             show_label=True,
-                            placeholder=f"在这里输入API地址...",
-                            label="API地址",
-                            value="https://api.openai.com/v1/chat/completions",
-                            lines=2,
+                            placeholder=f"在这里输入API-Host...",
+                            label="API-Host",
+                            value="api.openai.com",
+                            lines=1,
                         )
                         changeAPIURLBtn = gr.Button("🔄 切换API地址")
                         proxyTxt = gr.Textbox(
@@ -222,7 +198,7 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
                         changeProxyBtn = gr.Button("🔄 设置代理地址")
 
     gr.Markdown(description)
-
+    gr.HTML(footer.format(versions=versions_html()), elem_id="footer")
     chatgpt_predict_args = dict(
         fn=predict,
         inputs=[
@@ -266,6 +242,7 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
     get_usage_args = dict(
         fn=get_usage, inputs=[user_api_key], outputs=[usageTxt], show_progress=False
     )
+
 
     # Chatbot
     cancelBtn.click(cancel_outputing, [], [])
@@ -325,7 +302,7 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
             token_count,
             top_p,
             temperature,
-            gr.State(max_token_streaming//2 if use_streaming_checkbox.value else max_token_all//2),
+            gr.State(sum(token_count.value[-4:])),
             model_select_dropdown,
             language_select_dropdown,
         ],
@@ -334,8 +311,11 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
     )
     reduceTokenBtn.click(**get_usage_args)
 
+    updateDocConfigBtn.click(update_doc_config, [two_column], None)
+
     # ChatGPT
     keyTxt.change(submit_key, keyTxt, [user_api_key, status_display]).then(**get_usage_args)
+    keyTxt.submit(**get_usage_args)
 
     # Template
     templateRefreshBtn.click(get_template_names, None, [templateFileSelectDropdown])
@@ -355,37 +335,37 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
     # S&L
     saveHistoryBtn.click(
         save_chat_history,
-        [saveFileName, systemPromptTxt, history, chatbot],
+        [saveFileName, systemPromptTxt, history, chatbot, user_name],
         downloadFile,
         show_progress=True,
     )
-    saveHistoryBtn.click(get_history_names, None, [historyFileSelectDropdown])
+    saveHistoryBtn.click(get_history_names, [gr.State(False), user_name], [historyFileSelectDropdown])
     exportMarkdownBtn.click(
         export_markdown,
-        [saveFileName, systemPromptTxt, history, chatbot],
+        [saveFileName, systemPromptTxt, history, chatbot, user_name],
         downloadFile,
         show_progress=True,
     )
-    historyRefreshBtn.click(get_history_names, None, [historyFileSelectDropdown])
+    historyRefreshBtn.click(get_history_names, [gr.State(False), user_name], [historyFileSelectDropdown])
     historyFileSelectDropdown.change(
         load_chat_history,
-        [historyFileSelectDropdown, systemPromptTxt, history, chatbot],
+        [historyFileSelectDropdown, systemPromptTxt, history, chatbot, user_name],
         [saveFileName, systemPromptTxt, history, chatbot],
         show_progress=True,
     )
     downloadFile.change(
         load_chat_history,
-        [downloadFile, systemPromptTxt, history, chatbot],
+        [downloadFile, systemPromptTxt, history, chatbot, user_name],
         [saveFileName, systemPromptTxt, history, chatbot],
     )
 
     # Advanced
     default_btn.click(
-        reset_default, [], [apiurlTxt, proxyTxt, status_display], show_progress=True
+        reset_default, [], [apihostTxt, proxyTxt, status_display], show_progress=True
     )
     changeAPIURLBtn.click(
-        change_api_url,
-        [apiurlTxt],
+        change_api_host,
+        [apihostTxt],
         [status_display],
         show_progress=True,
     )
@@ -412,7 +392,7 @@ if __name__ == "__main__":
             demo.queue(concurrency_count=CONCURRENT_COUNT).launch(
                 server_name="0.0.0.0",
                 server_port=7860,
-                auth=(username, password),
+                auth=auth_list,
                 favicon_path="./assets/favicon.ico",
             )
         else:
@@ -427,7 +407,7 @@ if __name__ == "__main__":
         if authflag:
             demo.queue(concurrency_count=CONCURRENT_COUNT).launch(
                 share=False,
-                auth=(username, password),
+                auth=auth_list,
                 favicon_path="./assets/favicon.ico",
                 inbrowser=False,
             )

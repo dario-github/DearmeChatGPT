@@ -14,10 +14,12 @@ from duckduckgo_search import ddg
 import asyncio
 import aiohttp
 
+
 from modules.presets import *
 from modules.llama_func import *
 from modules.utils import *
 import modules.shared as shared
+from modules.config import retrieve_proxy
 
 # logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s")
 
@@ -58,39 +60,20 @@ def get_response(
     else:
         timeout = timeout_all
 
-    # 获取环境变量中的代理设置
-    http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
-    https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
 
-    # 如果存在代理设置，使用它们
-    proxies = {}
-    if http_proxy:
-        logging.info(f"使用 HTTP 代理: {http_proxy}")
-        proxies["http"] = http_proxy
-    if https_proxy:
-        logging.info(f"使用 HTTPS 代理: {https_proxy}")
-        proxies["https"] = https_proxy
+    # 如果有自定义的api-host，使用自定义host发送请求，否则使用默认设置发送请求
+    if shared.state.completion_url != COMPLETION_URL:
+        logging.info(f"使用自定义API URL: {shared.state.completion_url}")
 
-    # 如果有自定义的api-url，使用自定义url发送请求，否则使用默认设置发送请求
-    if shared.state.api_url != API_URL:
-        logging.info(f"使用自定义API URL: {shared.state.api_url}")
-    if proxies:
+    with retrieve_proxy():
         response = requests.post(
-            shared.state.api_url,
-            headers=headers,
-            json=payload,
-            stream=True,
-            timeout=timeout,
-            proxies=proxies,
-        )
-    else:
-        response = requests.post(
-            shared.state.api_url,
+            shared.state.completion_url,
             headers=headers,
             json=payload,
             stream=True,
             timeout=timeout,
         )
+
     return response
 
 
@@ -121,13 +104,17 @@ def stream_predict(
     else:
         chatbot.append((inputs, ""))
     user_token_count = 0
+    if fake_input is not None:
+        input_token_count = count_token(construct_user(fake_input))
+    else:
+        input_token_count = count_token(construct_user(inputs))
     if len(all_token_counts) == 0:
         system_prompt_token_count = count_token(construct_system(system_prompt))
         user_token_count = (
-            count_token(construct_user(inputs)) + system_prompt_token_count
+            input_token_count + system_prompt_token_count
         )
     else:
-        user_token_count = count_token(construct_user(inputs))
+        user_token_count = input_token_count
     all_token_counts.append(user_token_count)
     logging.info(f"输入token计数: {user_token_count}")
     yield get_return_value()
@@ -155,6 +142,8 @@ def stream_predict(
     yield get_return_value()
     error_json_str = ""
 
+    if fake_input is not None:
+        history[-2] = construct_user(fake_input)
     for chunk in tqdm(response.iter_lines()):
         if counter == 0:
             counter += 1
@@ -219,7 +208,10 @@ def predict_all(
         chatbot.append((fake_input, ""))
     else:
         chatbot.append((inputs, ""))
-    all_token_counts.append(count_token(construct_user(inputs)))
+    if fake_input is not None:
+        all_token_counts.append(count_token(construct_user(fake_input)))
+    else:
+        all_token_counts.append(count_token(construct_user(inputs)))
     try:
         response = get_response(
             openai_api_key,
@@ -242,13 +234,22 @@ def predict_all(
         status_text = standard_error_msg + ssl_error_prompt + error_retrieve_prompt
         return chatbot, history, status_text, all_token_counts
     response = json.loads(response.text)
-    content = response["choices"][0]["message"]["content"]
-    history[-1] = construct_assistant(content)
-    chatbot[-1] = (chatbot[-1][0], content+display_append)
-    total_token_count = response["usage"]["total_tokens"]
-    all_token_counts[-1] = total_token_count - sum(all_token_counts)
-    status_text = construct_token_message(total_token_count)
-    return chatbot, history, status_text, all_token_counts
+    if fake_input is not None:
+        history[-2] = construct_user(fake_input)
+    try:
+        content = response["choices"][0]["message"]["content"]
+        history[-1] = construct_assistant(content)
+        chatbot[-1] = (chatbot[-1][0], content+display_append)
+        total_token_count = response["usage"]["total_tokens"]
+        if fake_input is not None:
+            all_token_counts[-1] += count_token(construct_assistant(content))
+        else:
+            all_token_counts[-1] = total_token_count - sum(all_token_counts)
+        status_text = construct_token_message(total_token_count)
+        return chatbot, history, status_text, all_token_counts
+    except KeyError:
+        status_text = standard_error_msg + str(response)
+        return chatbot, history, status_text, all_token_counts
 
 
 def predict(
@@ -267,42 +268,67 @@ def predict(
     reply_language="中文",
     should_check_token_count=True,
 ):  # repetition_penalty, top_k
+    from llama_index.indices.query.vector_store import GPTVectorStoreIndexQuery
+    from llama_index.indices.query.schema import QueryBundle
+    from langchain.llms import OpenAIChat
+
+    
     logging.info("输入为：" + colorama.Fore.BLUE + f"{inputs}" + colorama.Style.RESET_ALL)
     if should_check_token_count:
         yield chatbot+[(inputs, "")], history, "开始生成回答……", all_token_counts
     if reply_language == "跟随问题语言（不稳定）":
         reply_language = "the same language as the question, such as English, 中文, 日本語, Español, Français, or Deutsch."
+    old_inputs = None
+    display_reference = []
+    limited_context = False
     if files:
+        limited_context = True
+        old_inputs = inputs
         msg = "加载索引中……（这可能需要几分钟）"
         logging.info(msg)
         yield chatbot+[(inputs, "")], history, msg, all_token_counts
         index = construct_index(openai_api_key, file_src=files)
         msg = "索引构建完成，获取回答中……"
+        logging.info(msg)
         yield chatbot+[(inputs, "")], history, msg, all_token_counts
-        history, chatbot, status_text = chat_ai(openai_api_key, index, inputs, history, chatbot, reply_language)
-        yield chatbot, history, status_text, all_token_counts
-        return
-
-    old_inputs = ""
-    link_references = []
-    if use_websearch:
+        with retrieve_proxy():
+            llm_predictor = LLMPredictor(llm=OpenAIChat(temperature=0, model_name=selected_model))
+            prompt_helper = PromptHelper(max_input_size = 4096, num_output = 5, max_chunk_overlap = 20, chunk_size_limit=600)
+            from llama_index import ServiceContext
+            service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, prompt_helper=prompt_helper)
+            query_object = GPTVectorStoreIndexQuery(index.index_struct, service_context=service_context, similarity_top_k=5, vector_store=index._vector_store, docstore=index._docstore)
+            query_bundle = QueryBundle(inputs)
+            nodes = query_object.retrieve(query_bundle)
+        reference_results = [n.node.text for n in nodes]
+        reference_results = add_source_numbers(reference_results, use_source=False)
+        display_reference = add_details(reference_results)
+        display_reference = "\n\n" + "".join(display_reference)
+        inputs = (
+            replace_today(PROMPT_TEMPLATE)
+            .replace("{query_str}", inputs)
+            .replace("{context_str}", "\n\n".join(reference_results))
+            .replace("{reply_language}", reply_language )
+        )
+    elif use_websearch:
+        limited_context = True
         search_results = ddg(inputs, max_results=5)
         old_inputs = inputs
-        web_results = []
+        reference_results = []
         for idx, result in enumerate(search_results):
             logging.info(f"搜索结果{idx + 1}：{result}")
             domain_name = urllib3.util.parse_url(result["href"]).host
-            web_results.append(f'[{idx+1}]"{result["body"]}"\nURL: {result["href"]}')
-            link_references.append(f"{idx+1}. [{domain_name}]({result['href']})\n")
-        link_references = "\n\n" + "".join(link_references)
+            reference_results.append([result["body"], result["href"]])
+            display_reference.append(f"{idx+1}. [{domain_name}]({result['href']})\n")
+        reference_results = add_source_numbers(reference_results)
+        display_reference = "\n\n" + "".join(display_reference)
         inputs = (
             replace_today(WEBSEARCH_PTOMPT_TEMPLATE)
             .replace("{query}", inputs)
-            .replace("{web_results}", "\n\n".join(web_results))
+            .replace("{web_results}", "\n\n".join(reference_results))
             .replace("{reply_language}", reply_language )
         )
     else:
-        link_references = ""
+        display_reference = ""
 
     if len(openai_api_key) != 51:
         status_text = standard_error_msg + no_apikey_msg
@@ -335,7 +361,7 @@ def predict(
             temperature,
             selected_model,
             fake_input=old_inputs,
-            display_append=link_references
+            display_append=display_reference
         )
         for chatbot, history, status_text, all_token_counts in iter:
             if shared.state.interrupted:
@@ -355,7 +381,7 @@ def predict(
             temperature,
             selected_model,
             fake_input=old_inputs,
-            display_append=link_references
+            display_append=display_reference
         )
         yield chatbot, history, status_text, all_token_counts
 
@@ -368,10 +394,15 @@ def predict(
             + colorama.Style.RESET_ALL
         )
 
+    if limited_context:
+        history = history[-4:]
+        all_token_counts = all_token_counts[-2:]
+        yield chatbot, history, status_text, all_token_counts
+
     if stream:
-        max_token = max_token_streaming
+        max_token = MODEL_SOFT_TOKEN_LIMIT[selected_model]["streaming"]
     else:
-        max_token = max_token_all
+        max_token = MODEL_SOFT_TOKEN_LIMIT[selected_model]["all"]
 
     if sum(all_token_counts) > max_token and should_check_token_count:
         status_text = f"精简token中{all_token_counts}/{max_token}"
