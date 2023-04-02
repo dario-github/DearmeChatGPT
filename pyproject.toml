@@ -9,6 +9,12 @@ readme = "README.md"
 python = "^3.10"
 flask = "^2.2.3"
 flask-cors = "^3.0.10"
+flask-httpauth = "^4.7.0"
+werkzeug = "^2.2.3"
+pymongo = "^4.3.3"
+gradio = "^3.23.0"
+flask-login = "^0.6.2"
+flask-sqlalchemy = "^3.0.3"
 
 
 [tool.poetry.group.dev.dependencies]

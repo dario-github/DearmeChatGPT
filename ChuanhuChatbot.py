@@ -402,7 +402,7 @@ logging.info(
     + colorama.Style.RESET_ALL
 )
 # 默认开启本地服务器，默认可以直接从IP访问，默认不创建公开分享链接
-demo.title = "亲爱的我 ❤️"
+demo.title = "DearMeChat"
 
 if __name__ == "__main__":
     reload_javascript()
@@ -438,4 +438,4 @@ if __name__ == "__main__":
         # demo.queue(concurrency_count=CONCURRENT_COUNT).launch(
             # server_name="0.0.0.0", server_port=7860, share=False)  # 可自定义端口
         # demo.queue(concurrency_count=CONCURRENT_COUNT).launch(server_name="0.0.0.0", server_port=7860,auth=("在这里填写用户名", "在这里填写密码")) # 可设置用户名与密码
-            demo.queue(concurrency_count=CONCURRENT_COUNT).launch(server_name="0.0.0.0", server_port=7860, auth=("dearme", "dearme")) # 适合Nginx反向代理
+            demo.queue(concurrency_count=CONCURRENT_COUNT).launch(inbrowser=False, share=False, server_name="0.0.0.0", server_port=7860, auth=("chat", "chat")) # 适合Nginx反向代理
