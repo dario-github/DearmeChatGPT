@@ -23,7 +23,7 @@ from pygments.lexers import get_lexer_by_name
 from pygments.formatters import HtmlFormatter
 
 from modules.presets import *
-import modules.shared as shared
+from . import shared
 from modules.config import retrieve_proxy
 
 if TYPE_CHECKING:
@@ -375,8 +375,9 @@ def replace_today(prompt):
 
 def get_geoip():
     try:
-        response = requests.get(
-        "https://ipapi.co/json/?key=VS19QTAbkBfyr9BZzs66yGHX7kEnaOWTpLwSwelqfsqdNQqzjs", timeout=5)
+        with retrieve_proxy():
+            response = requests.get(
+            "https://ipapi.co/json/?key=VS19QTAbkBfyr9BZzs66yGHX7kEnaOWTpLwSwelqfsqdNQqzjs", timeout=5)
         data = response.json()
     except:
         data = {"error": True, "reason": "连接ipapi失败"}

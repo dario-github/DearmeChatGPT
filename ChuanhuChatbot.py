@@ -5,6 +5,7 @@ import sys
 
 import gradio as gr
 
+from modules import config
 from modules.config import *
 from modules.utils import *
 from modules.presets import *
@@ -50,6 +51,7 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
             with gr.Row():
                 with gr.Column(scale=12):
                     user_input = gr.Textbox(
+                        elem_id="user_input_tb",
                         show_label=False, placeholder="在这里输入"
                     ).style(container=False)
                 with gr.Column(min_width=70, scale=1):
@@ -75,7 +77,10 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
                         visible=not HIDE_MY_KEY,
                         label="API-Key",
                     )
-                    usageTxt = gr.Markdown("**发送消息** 或 **提交key** 以显示额度", elem_id="usage_display")
+                    if multi_api_key:
+                        usageTxt = gr.Markdown("多账号模式已开启，无需输入key，可直接开始对话", elem_id="usage_display")
+                    else:
+                        usageTxt = gr.Markdown("**发送消息** 或 **提交key** 以显示额度", elem_id="usage_display")
                     model_select_dropdown = gr.Dropdown(
                         label="选择模型", choices=MODELS, multiselect=False, value=MODELS[0]
                     )
@@ -180,11 +185,12 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
                         )
 
                     with gr.Accordion("网络设置", open=False):
+                        # 优先展示自定义的api_host
                         apihostTxt = gr.Textbox(
                             show_label=True,
                             placeholder=f"在这里输入API-Host...",
                             label="API-Host",
-                            value="api.openai.com",
+                            value=config.api_host or shared.API_HOST,
                             lines=1,
                         )
                         changeAPIURLBtn = gr.Button("🔄 切换API地址")
