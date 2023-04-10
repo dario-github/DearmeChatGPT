@@ -5,7 +5,7 @@ from pathlib import Path
 import gradio as gr
 
 # ChatGPT 设置
-initial_prompt = "你是一个非常专业的个人助理"
+INITIAL_SYSTEM_PROMPT = "你是一个非常专业的个人助理"
 API_URL = "https://api.openai.com/v1/chat/completions"
 API_HOST = "api.openai.com"
 COMPLETION_URL = "https://api.openai.com/v1/chat/completions"

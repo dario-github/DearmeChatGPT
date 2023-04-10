@@ -11,7 +11,7 @@ from modules.utils import *
 from modules.presets import *
 from modules.overwrites import *
 from modules.models import ModelManager
-
+import colorama
 gr.Chatbot.postprocess = postprocess
 PromptHelper.compact_text_chunks = compact_text_chunks
 
