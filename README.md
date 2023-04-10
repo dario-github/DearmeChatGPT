@@ -1,11 +1,11 @@
-<h1 align="center">川虎 ChatGPT 🐯 Chuanhu ChatGPT</h1>
+<h1 align="center">川虎 Chat 🐯 Chuanhu Chat</h1>
 <div align="center">
   <a href="https://github.com/GaiZhenBiao/ChuanhuChatGPT">
     <img src="https://user-images.githubusercontent.com/70903329/227087087-93b37d64-7dc3-4738-a518-c1cf05591c8a.png" alt="Logo" height="156">
   </a>
 
   <p align="center">
-    <h3>为ChatGPT API提供了一个轻快好用的Web图形界面</h3>
+    <h3>为ChatGPT/ChatGLM/LLaMA等多种LLM提供了一个轻快好用的Web图形界面</h3>
     <p align="center">
       <a href="https://github.com/GaiZhenbiao/ChuanhuChatGPT/blob/main/LICENSE">
         <img alt="Tests Passing" src="https://img.shields.io/github/license/GaiZhenbiao/ChuanhuChatGPT" />
@@ -13,19 +13,13 @@
       <a href="https://gradio.app/">
         <img alt="GitHub Contributors" src="https://img.shields.io/badge/Base-Gradio-fb7d1a?style=flat" />
       </a>
-      <a href="https://github.com/GaiZhenBiao/ChuanhuChatGPT/graphs/contributors">
-        <img alt="GitHub Contributors" src="https://img.shields.io/github/contributors/GaiZhenBiao/ChuanhuChatGPT" />
-      </a>
-      <a href="https://github.com/GaiZhenBiao/ChuanhuChatGPT/issues">
-        <img alt="Issues" src="https://img.shields.io/github/issues/GaiZhenBiao/ChuanhuChatGPT?color=0088ff" />
-      </a>
-      <a href="https://github.com/GaiZhenBiao/ChuanhuChatGPT/pulls">
-        <img alt="GitHub pull requests" src="https://img.shields.io/github/issues-pr/GaiZhenBiao/ChuanhuChatGPT?color=0088ff" />
+      <a href="https://t.me/tkdifferent">
+        <img alt="GitHub pull requests" src="https://img.shields.io/badge/Telegram-Group-blue.svg?logo=telegram" />
       </a>
       <p>
-      	实时回复 / 无限对话 / 保存对话记录 / 预设Prompt集 / 联网搜索 / 根据文件回答
-      	<br/>
-      	渲染LaTex / 渲染表格 / 渲染代码 / 代码高亮 / 自定义api-URL / “小而美”的体验 / Ready for GPT-4
+        实时回复 / 无限对话 / 保存对话记录 / 预设Prompt集 / 联网搜索 / 根据文件回答 <br />
+        渲染LaTeX / 渲染表格 / 代码高亮 / 自动亮暗色切换 / 自适应输入框位置 / “小而美”的体验 <br />
+        自定义api-Host / 多API Key均衡负载 / 多用户显示 / 适配GPT-4
       </p>
       <a href="https://www.bilibili.com/video/BV1mo4y1r7eE"><strong>视频教程</strong></a>
         ·
@@ -107,7 +101,7 @@
 		"users": [
 			["用户1的用户名", "用户1的密码"],
 			["用户2的用户名", "用户2的密码"]
-		], 
+		],
 	}
 	```
 	* 如果不设置用户名与密码，可以直接将“users”字段整段删去，或留空为 `"users": [], `
@@ -346,6 +340,8 @@ docker run -d --name chatgpt \
 
 - [想要做出贡献？](https://github.com/GaiZhenbiao/ChuanhuChatGPT/wiki/贡献指南)
 - [项目更新情况？](https://github.com/GaiZhenbiao/ChuanhuChatGPT/wiki/更新日志)
+- [二次开发许可？](https://github.com/GaiZhenbiao/ChuanhuChatGPT/wiki/使用许可)
+- [如何引用项目？](https://github.com/GaiZhenbiao/ChuanhuChatGPT/wiki/使用许可#如何引用该项目)
 
 ## Starchart
 

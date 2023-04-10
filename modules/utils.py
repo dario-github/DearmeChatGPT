@@ -21,6 +21,7 @@ from markdown import markdown
 from pygments import highlight
 from pygments.lexers import get_lexer_by_name
 from pygments.formatters import HtmlFormatter
+import pandas as pd
 
 from modules.presets import *
 from . import shared
@@ -152,104 +153,22 @@ def construct_assistant(text):
     return construct_text("assistant", text)
 
 
-def construct_token_message(token, stream=False):
-    return f"Token 计数: {token}"
-
-
-def delete_first_conversation(history, previous_token_count):
-    if history:
-        del history[:2]
-        del previous_token_count[0]
-    return (
-        history,
-        previous_token_count,
-        construct_token_message(sum(previous_token_count)),
-    )
-
-
-def delete_last_conversation(chatbot, history, previous_token_count):
-    if len(chatbot) > 0 and standard_error_msg in chatbot[-1][1]:
-        logging.info("由于包含报错信息，只删除chatbot记录")
-        chatbot.pop()
-        return chatbot, history
-    if len(history) > 0:
-        logging.info("删除了一组对话历史")
-        history.pop()
-        history.pop()
-    if len(chatbot) > 0:
-        logging.info("删除了一组chatbot对话")
-        chatbot.pop()
-    if len(previous_token_count) > 0:
-        logging.info("删除了一组对话的token计数记录")
-        previous_token_count.pop()
-    return (
-        chatbot,
-        history,
-        previous_token_count,
-        construct_token_message(sum(previous_token_count)),
-    )
-
-
 def save_file(filename, system, history, chatbot, user_name):
-    logging.info(f"{user_name} 保存对话历史中……")
-    os.makedirs(HISTORY_DIR / user_name, exist_ok=True)
+    logging.debug(f"{user_name} 保存对话历史中……")
+    os.makedirs(os.path.join(HISTORY_DIR, user_name), exist_ok=True)
     if filename.endswith(".json"):
         json_s = {"system": system, "history": history, "chatbot": chatbot}
         print(json_s)
-        with open(os.path.join(HISTORY_DIR / user_name, filename), "w") as f:
+        with open(os.path.join(HISTORY_DIR, user_name, filename), "w") as f:
             json.dump(json_s, f)
     elif filename.endswith(".md"):
         md_s = f"system: \n- {system} \n"
         for data in history:
             md_s += f"\n{data['role']}: \n- {data['content']} \n"
-        with open(os.path.join(HISTORY_DIR / user_name, filename), "w", encoding="utf8") as f:
+        with open(os.path.join(HISTORY_DIR, user_name, filename), "w", encoding="utf8") as f:
             f.write(md_s)
-    logging.info(f"{user_name} 保存对话历史完毕")
-    return os.path.join(HISTORY_DIR / user_name, filename)
-
-
-def save_chat_history(filename, system, history, chatbot, user_name):
-    if filename == "":
-        return
-    if not filename.endswith(".json"):
-        filename += ".json"
-    return save_file(filename, system, history, chatbot, user_name)
-
-
-def export_markdown(filename, system, history, chatbot, user_name):
-    if filename == "":
-        return
-    if not filename.endswith(".md"):
-        filename += ".md"
-    return save_file(filename, system, history, chatbot, user_name)
-
-
-def load_chat_history(filename, system, history, chatbot, user_name):
-    logging.info(f"{user_name} 加载对话历史中……")
-    if type(filename) != str:
-        filename = filename.name
-    try:
-        with open(os.path.join(HISTORY_DIR / user_name, filename), "r") as f:
-            json_s = json.load(f)
-        try:
-            if type(json_s["history"][0]) == str:
-                logging.info("历史记录格式为旧版，正在转换……")
-                new_history = []
-                for index, item in enumerate(json_s["history"]):
-                    if index % 2 == 0:
-                        new_history.append(construct_user(item))
-                    else:
-                        new_history.append(construct_assistant(item))
-                json_s["history"] = new_history
-                logging.info(new_history)
-        except:
-            # 没有对话历史
-            pass
-        logging.info(f"{user_name} 加载对话历史完毕")
-        return filename, json_s["system"], json_s["history"], json_s["chatbot"]
-    except FileNotFoundError:
-        logging.info(f"{user_name} 没有找到对话历史文件，不执行任何操作")
-        return filename, system, history, chatbot
+    logging.debug(f"{user_name} 保存对话历史完毕")
+    return os.path.join(HISTORY_DIR, user_name, filename)
 
 
 def sorted_by_pinyin(list):
@@ -257,7 +176,7 @@ def sorted_by_pinyin(list):
 
 
 def get_file_names(dir, plain=False, filetypes=[".json"]):
-    logging.info(f"获取文件名列表，目录为{dir}，文件类型为{filetypes}，是否为纯文本列表{plain}")
+    logging.debug(f"获取文件名列表，目录为{dir}，文件类型为{filetypes}，是否为纯文本列表{plain}")
     files = []
     try:
         for type in filetypes:
@@ -275,14 +194,13 @@ def get_file_names(dir, plain=False, filetypes=[".json"]):
 
 
 def get_history_names(plain=False, user_name=""):
-    logging.info(f"从用户 {user_name} 中获取历史记录文件名列表")
-    return get_file_names(HISTORY_DIR / user_name, plain)
+    logging.debug(f"从用户 {user_name} 中获取历史记录文件名列表")
+    return get_file_names(os.path.join(HISTORY_DIR, user_name), plain)
 
 
 def load_template(filename, mode=0):
-    logging.info(f"加载模板文件{filename}，模式为{mode}（0为返回字典和下拉菜单，1为返回下拉菜单，2为返回字典）")
+    logging.debug(f"加载模板文件{filename}，模式为{mode}（0为返回字典和下拉菜单，1为返回下拉菜单，2为返回字典）")
     lines = []
-    logging.info("Loading template...")
     if filename.endswith(".json"):
         with open(os.path.join(TEMPLATES_DIR, filename), "r", encoding="utf8") as f:
             lines = json.load(f)
@@ -301,26 +219,21 @@ def load_template(filename, mode=0):
     else:
         choices = sorted_by_pinyin([row[0] for row in lines])
         return {row[0]: row[1] for row in lines}, gr.Dropdown.update(
-            choices=choices, value=choices[0]
+            choices=choices
         )
 
 
 def get_template_names(plain=False):
-    logging.info("获取模板文件名列表")
+    logging.debug("获取模板文件名列表")
     return get_file_names(TEMPLATES_DIR, plain, filetypes=[".csv", "json"])
 
 
 def get_template_content(templates, selection, original_system_prompt):
-    logging.info(f"应用模板中，选择为{selection}，原始系统提示为{original_system_prompt}")
+    logging.debug(f"应用模板中，选择为{selection}，原始系统提示为{original_system_prompt}")
     try:
         return templates[selection]
     except:
         return original_system_prompt
-
-
-def reset_state():
-    logging.info("重置状态")
-    return [], [], [], construct_token_message(0)
 
 
 def reset_textbox():
@@ -499,3 +412,41 @@ def add_details(lst):
             f"<details><summary>{brief}...</summary><p>{txt}</p></details>"
         )
     return nodes
+
+
+def sheet_to_string(sheet, sheet_name = None):
+    result = []
+    for index, row in sheet.iterrows():
+        row_string = ""
+        for column in sheet.columns:
+            row_string += f"{column}: {row[column]}, "
+        row_string = row_string.rstrip(", ")
+        row_string += "."
+        result.append(row_string)
+    return result
+
+def excel_to_string(file_path):
+    # 读取Excel文件中的所有工作表
+    excel_file = pd.read_excel(file_path, engine='openpyxl', sheet_name=None)
+
+    # 初始化结果字符串
+    result = []
+
+    # 遍历每一个工作表
+    for sheet_name, sheet_data in excel_file.items():
+
+        # 处理当前工作表并添加到结果字符串
+        result += sheet_to_string(sheet_data, sheet_name=sheet_name)
+
+
+    return result
+
+def get_last_day_of_month(any_day):
+    # The day 28 exists in every month. 4 days later, it's always next month
+    next_month = any_day.replace(day=28) + datetime.timedelta(days=4)
+    # subtracting the number of the current day brings us back one month
+    return next_month - datetime.timedelta(days=next_month.day)
+
+def get_model_source(model_name, alternative_source):
+    if model_name == "gpt2-medium":
+        return "https://huggingface.co/gpt2-medium"
