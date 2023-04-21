@@ -17,11 +17,11 @@ import asyncio
 import aiohttp
 from enum import Enum
 
-from .presets import *
-from .llama_func import *
-from .utils import *
-from . import shared
-from .config import retrieve_proxy
+from ..presets import *
+from ..llama_func import *
+from ..utils import *
+from .. import shared
+from ..config import retrieve_proxy
 
 
 class ModelType(Enum):
@@ -30,6 +30,7 @@ class ModelType(Enum):
     ChatGLM = 1
     LLaMA = 2
     XMChat = 3
+    StableLM = 4
 
     @classmethod
     def get_type(cls, model_name: str):
@@ -43,6 +44,8 @@ class ModelType(Enum):
             model_type = ModelType.LLaMA
         elif "xmchat" in model_name_lower:
             model_type = ModelType.XMChat
+        elif "stablelm" in model_name_lower:
+            model_type = ModelType.StableLM
         else:
             model_type = ModelType.Unknown
         return model_type
@@ -549,3 +552,13 @@ class BaseLLMModel:
         except FileNotFoundError:
             logging.warning(f"{user_name} 没有找到对话历史文件，不执行任何操作")
             return filename, self.system_prompt, chatbot
+
+    def like(self):
+        """like the last response, implement if needed
+        """
+        return gr.update()
+
+    def dislike(self):
+        """dislike the last response, implement if needed
+        """
+        return gr.update()
