@@ -31,6 +31,7 @@ class ModelType(Enum):
     LLaMA = 2
     XMChat = 3
     StableLM = 4
+    MOSS = 5
 
     @classmethod
     def get_type(cls, model_name: str):
@@ -46,6 +47,8 @@ class ModelType(Enum):
             model_type = ModelType.XMChat
         elif "stablelm" in model_name_lower:
             model_type = ModelType.StableLM
+        elif "moss" in model_name_lower:
+            model_type = ModelType.MOSS
         else:
             model_type = ModelType.Unknown
         return model_type
@@ -120,7 +123,7 @@ class BaseLLMModel:
 
     def count_token(self, user_input):
         """get token count from input, implement if needed"""
-        logging.warning("token count not implemented, using default")
+        # logging.warning("token count not implemented, using default")
         return len(user_input)
 
     def stream_next_chatbot(self, inputs, chatbot, fake_input=None, display_append=""):
