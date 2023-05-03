@@ -25,7 +25,7 @@ import pandas as pd
 
 from modules.presets import *
 from . import shared
-from modules.config import retrieve_proxy
+from modules.config import retrieve_proxy, hide_history_when_not_logged_in
 
 if TYPE_CHECKING:
     from typing import TypedDict
@@ -75,6 +75,9 @@ def export_markdown(current_model, *args):
     return current_model.export_markdown(*args)
 
 def load_chat_history(current_model, *args):
+    return current_model.load_chat_history(*args)
+
+def upload_chat_history(current_model, *args):
     return current_model.load_chat_history(*args)
 
 def set_token_upper_limit(current_model, *args):
@@ -180,13 +183,11 @@ def convert_mdtext(md_text):
     non_code_parts = code_block_pattern.split(md_text)[::2]
 
     result = []
+    raw = f'<div class="raw-message hideM">{html.escape(md_text)}</div>'
     for non_code, code in zip(non_code_parts, code_blocks + [""]):
         if non_code.strip():
             non_code = normalize_markdown(non_code)
-            if inline_code_pattern.search(non_code) or os.environ["RENDER_LATEX"]=="no":
-                result.append(markdown(non_code, extensions=["tables"]))
-            else:
-                result.append(mdtex2html.convert(non_code, extensions=["tables"]))
+            result.append(markdown(non_code, extensions=["tables"]))
         if code.strip():
             # _, code = detect_language(code)  # 暂时去除代码高亮功能，因为在大段代码的情况下会出现问题
             # code = code.replace("\n\n", "\n") # 暂时去除代码中的空行，因为在大段代码的情况下会出现问题
@@ -194,8 +195,10 @@ def convert_mdtext(md_text):
             code = markdown_to_html_with_syntax_highlight(code)
             result.append(code)
     result = "".join(result)
-    result += ALREADY_CONVERTED_MARK
-    return result
+    output = f'<div class="md-message">{result}</div>'
+    output += raw
+    output += ALREADY_CONVERTED_MARK
+    return output
 
 
 def convert_asis(userinput):
@@ -246,8 +249,11 @@ def save_file(filename, system, history, chatbot, user_name):
     os.makedirs(os.path.join(HISTORY_DIR, user_name), exist_ok=True)
     if filename.endswith(".json"):
         json_s = {"system": system, "history": history, "chatbot": chatbot}
-        print(json_s)
-        with open(os.path.join(HISTORY_DIR, user_name, filename), "w") as f:
+        if "/" in filename or "\\" in filename:
+            history_file_path = filename
+        else:
+            history_file_path = os.path.join(HISTORY_DIR, user_name, filename)
+        with open(history_file_path, "w") as f:
             json.dump(json_s, f)
     elif filename.endswith(".md"):
         md_s = f"system: \n- {system} \n"
@@ -283,7 +289,10 @@ def get_file_names(dir, plain=False, filetypes=[".json"]):
 
 def get_history_names(plain=False, user_name=""):
     logging.debug(f"从用户 {user_name} 中获取历史记录文件名列表")
-    return get_file_names(os.path.join(HISTORY_DIR, user_name), plain)
+    if user_name == "" and hide_history_when_not_logged_in:
+        return ""
+    else:
+        return get_file_names(os.path.join(HISTORY_DIR, user_name), plain)
 
 
 def load_template(filename, mode=0):
@@ -451,8 +460,8 @@ def run(command, desc=None, errdesc=None, custom_env=None, live=False):
         result = subprocess.run(command, shell=True, env=os.environ if custom_env is None else custom_env)
         if result.returncode != 0:
             raise RuntimeError(f"""{errdesc or 'Error running command'}.
-Command: {command}
-Error code: {result.returncode}""")
+                Command: {command}
+                Error code: {result.returncode}""")
 
         return ""
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, env=os.environ if custom_env is None else custom_env)
@@ -475,7 +484,7 @@ def versions_html():
         commit_hash = "<none>"
     if commit_hash != "<none>":
         short_commit = commit_hash[0:7]
-        commit_info = f"<a style=\"text-decoration:none\" href=\"https://github.com/GaiZhenbiao/ChuanhuChatGPT/commit/{short_commit}\">{short_commit}</a>"
+        commit_info = f"<a style=\"text-decoration:none;color:inherit\" href=\"https://github.com/GaiZhenbiao/ChuanhuChatGPT/commit/{short_commit}\">{short_commit}</a>"
     else:
         commit_info = "unknown \U0001F615"
     return f"""
@@ -483,7 +492,7 @@ def versions_html():
          • 
         Gradio: {gr.__version__}
          • 
-        Commit: {commit_info}
+        <a style="text-decoration:none;color:inherit" href="https://github.com/GaiZhenbiao/ChuanhuChatGPT">ChuanhuChat</a>: {commit_info}
         """
 
 def add_source_numbers(lst, source_name = "Source", use_source = True):
@@ -539,11 +548,46 @@ def get_model_source(model_name, alternative_source):
     if model_name == "gpt2-medium":
         return "https://huggingface.co/gpt2-medium"
 
-def refresh_ui_elements_on_load(current_model, selected_model_name):
-    return toggle_like_btn_visibility(selected_model_name)
+def refresh_ui_elements_on_load(current_model, selected_model_name, user_name):
+    current_model.set_user_identifier(user_name)
+    return toggle_like_btn_visibility(selected_model_name), *current_model.auto_load()
 
 def toggle_like_btn_visibility(selected_model_name):
     if selected_model_name == "xmchat":
         return gr.update(visible=True)
     else:
         return gr.update(visible=False)
+
+def new_auto_history_filename(dirname):
+    latest_file = get_latest_filepath(dirname)
+    if latest_file:
+        with open(os.path.join(dirname, latest_file), 'r') as f:
+            if len(f.read()) == 0:
+                return latest_file
+    now = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    return f'{now}.json'
+
+def get_latest_filepath(dirname):
+    pattern = re.compile(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}')
+    latest_time = None
+    latest_file = None
+    for filename in os.listdir(dirname):
+        if os.path.isfile(os.path.join(dirname, filename)):
+            match = pattern.search(filename)
+            if match and match.group(0) == filename[:19]:
+                time_str = filename[:19]
+                filetime = datetime.datetime.strptime(time_str, '%Y-%m-%d_%H-%M-%S')
+                if not latest_time or filetime > latest_time:
+                    latest_time = filetime
+                    latest_file = filename
+    return latest_file
+
+def get_history_filepath(username):
+    dirname = os.path.join(HISTORY_DIR, username)
+    os.makedirs(dirname, exist_ok=True)
+    latest_file = get_latest_filepath(dirname)
+    if not latest_file:
+        latest_file = new_auto_history_filename(dirname)
+
+    latest_file = os.path.join(dirname, latest_file)
+    return latest_file
