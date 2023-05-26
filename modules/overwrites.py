@@ -1,23 +1,13 @@
 from __future__ import annotations
 import logging
 
-from llama_index import Prompt
 from typing import List, Tuple
 import mdtex2html
 from gradio_client import utils as client_utils
 
 from modules.presets import *
-from modules.llama_func import *
-
-
-def compact_text_chunks(self, prompt: Prompt, text_chunks: List[str]) -> List[str]:
-    logging.debug("Compacting text chunks...🚀🚀🚀")
-    combined_str = [c.strip() for c in text_chunks if c.strip()]
-    combined_str = [f"[{index+1}] {c}" for index, c in enumerate(combined_str)]
-    combined_str = "\n\n".join(combined_str)
-    # resplit based on self.max_chunk_overlap
-    text_splitter = self.get_text_splitter_given_prompt(prompt, 1, padding=1)
-    return text_splitter.split_text(combined_str)
+from modules.index_func import *
+from modules.config import render_latex
 
 
 def postprocess(
@@ -85,6 +75,11 @@ with open("./assets/custom.js", "r", encoding="utf-8") as f, \
 def reload_javascript():
     print("Reloading javascript...")
     js = f'<script>{customJS}</script><script async>{externalScripts}</script>'
+    if render_latex:
+        js += """\
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-MML-AM_CHTML"></script>
+            <script type="text/x-mathjax-config">MathJax.Hub.Config({skipStartupTypeset: false, tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']],displayMath: [['$$','$$'], ['\\[','\\]']]}});</script>
+        """
     def template_response(*args, **kwargs):
         res = GradioTemplateResponseOriginal(*args, **kwargs)
         res.body = res.body.replace(b'</html>', f'{js}</html>'.encode("utf8"))

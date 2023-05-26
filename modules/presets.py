@@ -59,8 +59,6 @@ APPEARANCE_SWITCHER = """
 </div>
 """
 
-SUMMARIZE_PROMPT = "你是谁？我们刚才聊了什么？"  # 总结对话时的 prompt
-
 ONLINE_MODELS = [
     "gpt-3.5-turbo",
     "gpt-3.5-turbo-0301",
@@ -68,11 +66,15 @@ ONLINE_MODELS = [
     "gpt-4-0314",
     "gpt-4-32k",
     "gpt-4-32k-0314",
+    "川虎助理",
+    "川虎助理 Pro",
     "xmchat",
     "yuanai-1.0-base_10B",
     "yuanai-1.0-translate",
     "yuanai-1.0-dialog",
     "yuanai-1.0-rhythm_poems",
+    "minimax-abab4-chat",
+    "minimax-abab5-chat",
 ]
 
 LOCAL_MODELS = [
@@ -168,6 +170,12 @@ REFINE_TEMPLATE = """\
 用{reply_language}回复
 如果上下文无用，请返回原始答案。
 """
+
+SUMMARIZE_PROMPT = """Write a concise summary of the following:
+
+{text}
+
+CONCISE SUMMARY IN 中文:"""
 
 ALREADY_CONVERTED_MARK = "<!-- ALREADY CONVERTED BY PARSER. -->"
 

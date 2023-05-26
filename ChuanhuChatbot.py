@@ -15,7 +15,6 @@ from modules.models.models import get_model
 
 gr.Chatbot._postprocess_chat_messages = postprocess_chat_messages
 gr.Chatbot.postprocess = postprocess
-PromptHelper.compact_text_chunks = compact_text_chunks
 
 with open("assets/custom.css", "r", encoding="utf-8") as f:
     customCSS = f.read()
@@ -87,14 +86,9 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
                         label=i18n("选择LoRA模型"), choices=[], multiselect=False, interactive=True, visible=False
                     )
                     with gr.Row():
-                        use_streaming_checkbox = gr.Checkbox(
-                            label=i18n("实时传输回答"), value=True, visible=ENABLE_STREAMING_OPTION
-                        )
                         single_turn_checkbox = gr.Checkbox(label=i18n("单轮对话"), value=False)
                         use_websearch_checkbox = gr.Checkbox(label=i18n("使用在线搜索"), value=False)
-                        render_latex_checkbox = gr.Checkbox(
-                            label=i18n("渲染LaTeX公式"), value=render_latex, interactive=True, elem_id="render_latex_checkbox"
-                        )
+                        # render_latex_checkbox = gr.Checkbox(label=i18n("渲染LaTeX公式"), value=render_latex, interactive=True, elem_id="render_latex_checkbox")
                     language_select_dropdown = gr.Dropdown(
                         label=i18n("选择回复语言（针对搜索&索引功能）"),
                         choices=REPLY_LANGUAGES,
@@ -103,6 +97,7 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
                     )
                     index_files = gr.Files(label=i18n("上传"), type="file")
                     two_column = gr.Checkbox(label=i18n("双栏pdf"), value=advance_docs["pdf"].get("two_column", False))
+                    summarize_btn = gr.Button(i18n("总结"))
                     # TODO: 公式ocr
                     # formula_ocr = gr.Checkbox(label=i18n("识别公式"), value=advance_docs["pdf"].get("formula_ocr", False))
 
@@ -167,6 +162,9 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
                 with gr.Tab(label=i18n("高级")):
                     gr.Markdown(i18n("# ⚠️ 务必谨慎更改 ⚠️\n\n如果无法使用请恢复默认设置"))
                     gr.HTML(APPEARANCE_SWITCHER, elem_classes="insert_block")
+                    use_streaming_checkbox = gr.Checkbox(
+                            label=i18n("实时传输回答"), value=True, visible=ENABLE_STREAMING_OPTION
+                        )
                     with gr.Accordion(i18n("参数"), open=False):
                         temperature_slider = gr.Slider(
                             minimum=-0,
@@ -268,7 +266,7 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
 
     gr.Markdown(CHUANHU_DESCRIPTION, elem_id="description")
     gr.HTML(FOOTER.format(versions=versions_html()), elem_id="footer")
-    
+
     # https://github.com/gradio-app/gradio/pull/3296
     def create_greeting(request: gr.Request):
         if hasattr(request, "username") and request.username: # is not None or is not ""
@@ -335,7 +333,8 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
     submitBtn.click(**transfer_input_args).then(**chatgpt_predict_args, api_name="predict").then(**end_outputing_args)
     submitBtn.click(**get_usage_args)
 
-    index_files.change(handle_file_upload, [current_model, index_files, chatbot], [index_files, chatbot, status_display])
+    index_files.change(handle_file_upload, [current_model, index_files, chatbot, language_select_dropdown], [index_files, chatbot, status_display])
+    summarize_btn.click(handle_summarize_index, [current_model, index_files, chatbot, language_select_dropdown], [chatbot, status_display])
 
     emptyBtn.click(
         reset,
